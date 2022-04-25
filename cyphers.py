@@ -92,17 +92,7 @@ class Decryptor(BlockCypher):
             return Permutation(*encrypted_indices).encrypt(data)
 
 
-class Cypher(abc.ABC):
-    @abc.abstractmethod
-    def encrypt(self, data):
-        ...
-
-    @abc.abstractmethod
-    def decrypt(self, data):
-        ...
-
-
-class PaddingCypher(Cypher):
+class PaddingCypher:
     def __init__(self, block_cypher: Decryptor) -> None:
         self.block = block_cypher
 
@@ -125,3 +115,26 @@ class PaddingCypher(Cypher):
                   for i in range(len(data) // chunk_size)]
         decrypted_blocks = [self.block.decrypt(block) for block in blocks]
         return flatten(decrypted_blocks)[:original_len]
+
+
+class UnpaddingCypher:
+    def __init__(self, padding_cypher: PaddingCypher) -> None:
+        self._inner = padding_cypher
+
+    def encrypt(self, data):
+        return list(filter(lambda x: x is not None, self._inner.encrypt(data)[0]))
+
+    def decrypt(self, data):
+        chunk_size = self._inner.block.block_size()
+        original_len = len(data)
+        pad = chunk_size - len(data) % chunk_size
+        indices = range(len(data) + pad)
+        encrypted_indices = self.encrypt(indices)
+        data = iter(data)
+        padded_data = []
+        for idx in encrypted_indices:
+            if idx >= original_len:
+                padded_data += [None]
+            else:
+                padded_data += [next(data)]
+        return self._inner.decrypt(padded_data, original_len)

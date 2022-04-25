@@ -1,6 +1,6 @@
 
 import pytest
-from cyphers import Decryptor, PaddingCypher, Permutation, Railfence, Vertical
+from cyphers import Decryptor, PaddingCypher, Permutation, Railfence, UnpaddingCypher, Vertical
 
 
 def test_permutation_should_encrypt_data():
@@ -66,3 +66,23 @@ def test_padding_should_decrypt(padding_permutation):
 def test_padding_should_remove_pad_values(padding_permutation):
     assert padding_permutation.decrypt(
         ['c', 'a', 'd', 'b', None, 'e', None, 'f'], 6) == list("abcdef")
+
+
+@pytest.fixture
+def unpadding_permutation(padding_permutation):
+    return UnpaddingCypher(padding_permutation)
+
+
+def test_unpadding_encryption_should_work_for_matching_size(unpadding_permutation):
+    assert unpadding_permutation.encrypt("abcdefgh") == list("cadbgehf")
+
+
+def test_unpadding_encryption_should_work_for_unmatching_size(unpadding_permutation):
+    assert unpadding_permutation.encrypt(
+        "abcdef") == ['c', 'a', 'd', 'b', 'e', 'f']
+
+
+@pytest.mark.parametrize("data", ["abcdef", "abcdefg", "abc", "abcdefgh"])
+def test_unpadding_should_decrypt(unpadding_permutation, data):
+    encrypted = unpadding_permutation.encrypt(data)
+    assert unpadding_permutation.decrypt(encrypted) == list(data)
