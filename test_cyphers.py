@@ -1,5 +1,6 @@
-from re import L
-from cyphers import Decryptor, Permutation, Railfence, Vertical
+
+import pytest
+from cyphers import Decryptor, PaddingCypher, Permutation, Railfence, Vertical
 
 
 def test_permutation_should_encrypt_data():
@@ -42,3 +43,26 @@ def test_decryptor_should_work_with_vertical():
     cypher = Decryptor(Vertical(2, 4, Permutation(0, 1, 2, 3)))
     data = "abcdefgh"
     assert cypher.decrypt(cypher.encrypt(data)) == list(data)
+
+
+@pytest.fixture
+def padding_permutation():
+    return PaddingCypher(Permutation(1, 3, 0, 2))
+
+
+def test_padding_should_encrypt_matching_size(padding_permutation):
+    assert padding_permutation.encrypt("abcdefgh") == (list("cadbgehf"), 8)
+
+
+def test_padding_should_add_nones(padding_permutation):
+    assert padding_permutation.encrypt("abcdef") == (
+        ['c', 'a', 'd', 'b', None, 'e', None, 'f'], 6)
+
+
+def test_padding_should_decrypt(padding_permutation):
+    assert padding_permutation.decrypt(list("cadbgehf"), 8) == list("abcdefgh")
+
+
+def test_padding_should_remove_pad_values(padding_permutation):
+    assert padding_permutation.decrypt(
+        ['c', 'a', 'd', 'b', None, 'e', None, 'f'], 6) == list("abcdef")

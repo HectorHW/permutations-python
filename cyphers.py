@@ -3,6 +3,10 @@ from typing import List
 import itertools
 
 
+def flatten(iter):
+    return list(itertools.chain(*iter))
+
+
 class BlockCypher(abc.ABC):
     @abc.abstractmethod
     def block_size(self) -> int:
@@ -44,7 +48,7 @@ class Vertical(BlockCypher):
         assert len(data) == self.columns * self.rows
         blocks = [data[i::self.columns] for i in range(self.columns)]
         permuted = self.permutation.encrypt(blocks)
-        return list(itertools.chain(*permuted))
+        return flatten(permuted)
 
 
 class Railfence(BlockCypher):
@@ -66,7 +70,7 @@ class Railfence(BlockCypher):
             j += delta
             if j == 0 or j == self.rows-1:
                 delta *= -1
-        return [item for item in itertools.chain(*matrix) if item is not None]
+        return [item for item in flatten(matrix) if item is not None]
 
 
 class Decryptor(BlockCypher):
@@ -86,3 +90,38 @@ class Decryptor(BlockCypher):
             indices = list(range(self.block_size()))
             encrypted_indices = self.encrypt(indices)
             return Permutation(*encrypted_indices).encrypt(data)
+
+
+class Cypher(abc.ABC):
+    @abc.abstractmethod
+    def encrypt(self, data):
+        ...
+
+    @abc.abstractmethod
+    def decrypt(self, data):
+        ...
+
+
+class PaddingCypher(Cypher):
+    def __init__(self, block_cypher: Decryptor) -> None:
+        self.block = block_cypher
+
+    def encrypt(self, data):
+        chunk_size = self.block.block_size()
+        original_len = len(data)
+        if len(data) % chunk_size != 0:
+            pad = chunk_size - len(data) % chunk_size
+            data = list(data) + [None for _ in range(pad)]
+
+        blocks = [data[i*chunk_size:(i+1)*chunk_size]
+                  for i in range(len(data) // chunk_size)]
+        encrypted_blocks = [self.block.encrypt(block) for block in blocks]
+        return flatten(encrypted_blocks), original_len
+
+    def decrypt(self, data, original_len: int):
+        chunk_size = self.block.block_size()
+        assert len(data) % chunk_size == 0
+        blocks = [data[i*chunk_size:(i+1)*chunk_size]
+                  for i in range(len(data) // chunk_size)]
+        decrypted_blocks = [self.block.decrypt(block) for block in blocks]
+        return flatten(decrypted_blocks)[:original_len]
